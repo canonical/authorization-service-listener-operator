@@ -99,7 +99,9 @@ integration = [
     "pytest-jubilant>=2,<3",
     "jubilant",
     "pytest",
-    "pytest-asyncio",
+    "requests",
+    "tenacity",
+    "pyyaml",
 ]
 dev = [
     {include-group = "fmt"},
