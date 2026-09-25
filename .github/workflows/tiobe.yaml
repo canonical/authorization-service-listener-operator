@@ -1,0 +1,40 @@
+name: TIOBE Quality Checks
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+  schedule:
+    - cron: '0 7 1 * *'  # Runs monthly on the 1st at 07:00 UTC
+
+jobs:
+  TICS:
+    runs-on: [ self-hosted, amd64, tiobe, noble ]
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - name: Install project dependencies
+        run: |
+          find . -name '*requirements.txt' -exec echo Installing {} \; -exec pip install --break-system-packages -r {} \;
+          pip install --break-system-packages tox psycopg
+
+      - name: Run coverage tests
+        run: |
+          tox -e unit
+          mkdir coverage
+          mv coverage.xml ./coverage/
+
+      - name: Set TIOBE project name
+        run: echo "PROJECT_NAME=$(basename "${{ github.repository }}")" >> $GITHUB_ENV
+
+      - name: Run TICS quality analysis
+        uses: tiobe/tics-github-action@a53037a6bb9f71b6a97cdeb0ac41632266804b9e # v3
+        with:
+          mode: qserver
+          viewerUrl: https://canonical.tiobe.com/tiobeweb/TICS/api/cfg?name=default
+          ticsAuthToken: ${{ secrets.TICSAUTHTOKEN }}
+          project: ${{ env.PROJECT_NAME }}
+          installTics: true
+          filelist: .
+          recalc: ALL
