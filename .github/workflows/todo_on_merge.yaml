@@ -1,0 +1,20 @@
+name: TODO Scan After PR Merge
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  todo-to-issue:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          fetch-depth: 0
+
+      - name: TODOs to Issues
+        uses: alstr/todo-to-issue-action@64aca8fda7023259aada83ba44ad988c4c443657 # v5
+        with:
+          IGNORE: "lib/charms/(?!authorization_service/).*"
