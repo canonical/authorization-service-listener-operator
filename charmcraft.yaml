@@ -22,7 +22,7 @@ resources:
   oci-image:
     type: oci-image
     description: OCI container image for Authorization Service workload
-    upstream-source: ghcr.io/canonical/authorization-service:v2.0.3
+    upstream-source: ghcr.io/canonical/authorization-service:v2.1.0-candidate
 
 requires:
   authorization-service-info:
