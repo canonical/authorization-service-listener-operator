@@ -1,0 +1,35 @@
+name: ci
+run-name: CI for ${{ github.sha }} on ${{ github.ref_name }}
+
+on:
+   workflow_dispatch:
+   push:
+     branches:
+     - "main"
+     - "release-**"
+     - "track/**"
+     paths-ignore:
+     - "terraform/**"
+   pull_request:
+     branches:
+     - "*"
+     paths-ignore:
+     - "terraform/**"
+
+jobs:
+  tests:
+    name: CI
+    permissions:
+      contents: read
+      packages: read
+    secrets:
+      GH_USERNAME: ${{ secrets.GH_USERNAME }}
+      GH_PAT: ${{ secrets.GH_PAT }}
+    uses: canonical/identity-team/.github/workflows/charm-pull-request.yaml@fc85af7448538c473be450dc2c8ec5d158ea0d15 # v1.17.0
+    with:
+      container-name: "listener"
+      pytest-model-option: '--juju-model'
+      juju-model-name: 'testing'
+      # TODO: Enable when onboarded to charmcraft cache
+      use-charmcraftcache: false
+      node-size: large

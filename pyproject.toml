@@ -1,0 +1,119 @@
+# Copyright 2026 Canonical Ltd.
+# See LICENSE file for licensing details.
+
+# Testing tools configuration
+[tool.coverage.run]
+branch = true
+data_file = ".cover/.coverage"
+
+[tool.coverage.report]
+show_missing = true
+
+[tool.coverage.xml]
+output = ".cover/coverage.xml"
+
+[tool.pytest.ini_options]
+minversion = "6.0"
+log_cli_level = "INFO"
+pythonpath = ["src", "lib", "tests"]
+tmp_path_retention_policy = "none"
+tmp_path_retention_count = 0
+
+# Linting and formatting tools configuration
+[tool.codespell]
+skip = ".git,.tox,build,lib,venv,.venv,.mypy_cache,icon.svg,__pycache__"
+
+[tool.isort]
+line_length = 99
+profile = "black"
+
+[tool.ruff]
+line-length = 99
+include = [
+    "pyproject.toml",
+    "src/**/*.py",
+    "tests/**/*.py",
+]
+extend-exclude = ["__pycache__", "*.egg_info"]
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "W", "F", "C", "N", "D", "CPY"]
+ignore = [
+    "D100",
+    "D101",
+    "D102",
+    "D103",
+    "D105",
+    "D107",
+    "D203",
+    "D204",
+    "D213",
+    "D215",
+    "D400",
+    "D404",
+    "D406",
+    "D407",
+    "D408",
+    "D409",
+    "D413",
+    "E501",
+    "N818"
+]
+per-file-ignores = {"tests/*" = ["D100","D101","D102","D103","D104"]}
+
+[tool.ruff.lint.flake8-copyright]
+author = "Canonical Ltd."
+
+[project]
+name = "authorization-service-listener-operator"
+version = "0.1.0"
+description = "Canonical Authorization Service Listener Operator"
+requires-python = ">=3.10"
+dependencies = [
+    "authorization-service-operator-shared @ git+https://github.com/canonical/authorization-service-operator-shared.git@main",
+    "cosl~=1.9.1",
+    "lightkube~=0.21.0",
+    "lightkube-models~=1.35.0.8",
+    "ops~=3.0",
+    "pydantic>=2.11",
+]
+
+[dependency-groups]
+fmt = [
+    "isort",
+    "ruff",
+]
+lint = [
+    "codespell",
+    "isort",
+    "ruff",
+]
+unit = [
+    "coverage[toml]",
+    "ops[testing]",
+    "pytest",
+    "pytest-mock",
+]
+integration = [
+    "pytest-jubilant>=2,<3",
+    "jubilant",
+    "pytest",
+    "requests",
+    "tenacity",
+    "pyyaml",
+]
+dev = [
+    {include-group = "fmt"},
+    {include-group = "lint"},
+    {include-group = "unit"},
+    {include-group = "integration"},
+]
+
+[tool.uv]
+package = false
+
+# Shared library for the authorization service operators
+[tool.uv.sources]
+authorization-service-operator-shared = { git = "https://github.com/canonical/authorization-service-operator-shared.git", branch = "main" }
+
