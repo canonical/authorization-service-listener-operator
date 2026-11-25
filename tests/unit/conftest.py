@@ -193,9 +193,9 @@ def tracing_relation() -> testing.Relation:
     return testing.Relation(
         endpoint=TRACING_INTEGRATION_NAME,
         interface="tracing",
-        remote_app_name="tempo-k8s",
+        remote_app_name="tempo-coordinator-k8s",
         remote_app_data={
-            "receivers": '[{"protocol": {"name": "otlp_http", "type": "http"}, "url": "http://tempo:4318"}]'
+            "receivers": '[{"protocol": {"name": "otlp_grpc", "type": "grpc"}, "url": "tempo:4317"}]'
         },
     )
 
