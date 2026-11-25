@@ -67,7 +67,7 @@ juju integrate authorization-service-listener:sts-info secure-token-service:sts-
 - **`metrics-endpoint`** (`prometheus_scrape`): Exposes Prometheus metrics on port `9100` (`/metrics`).
 - **`grafana-dashboard`** (`grafana_dashboard`): Provides pre-configured Grafana dashboards to COS.
 - **`logging`** (`loki_push_api`): Forwards container logs to Loki.
-- **`tracing`** (`tracing`): Sends OpenTelemetry traces to Tempo (`otlp_http`).
+- **`tracing`** (`tracing`): Sends OpenTelemetry traces to Tempo (`otlp_grpc`).
 
 ## Development
 
