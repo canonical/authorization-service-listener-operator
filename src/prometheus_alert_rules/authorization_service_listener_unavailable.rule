@@ -1,0 +1,17 @@
+groups:
+- name: AuthorizationServiceListenerUnavailable
+  rules:
+  - alert: AuthorizationServiceListenerUnavailable-multiple
+    expr: sum by (juju_application, juju_model, juju_model_uuid) (up) / count by (juju_application, juju_model, juju_model_uuid) (up) < 0.7 and sum by (juju_application, juju_model, juju_model_uuid) (up) > 0
+    for: 1m
+    labels:
+      severity: warning
+    annotations:
+      summary: "More than 30% of units of {{ $labels.juju_application }} in model {{ $labels.juju_model }} are down"
+  - alert: AuthorizationServiceListenerUnavailable-all
+    expr: sum by (juju_application, juju_model, juju_model_uuid) (up) == 0
+    for: 1m
+    labels:
+      severity: critical
+    annotations:
+      summary: "All units of {{ $labels.juju_application }} in model {{ $labels.juju_model }} are down"

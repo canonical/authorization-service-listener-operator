@@ -29,7 +29,10 @@ from charms.observability_libs.v0.kubernetes_compute_resources_patch import (
     ResourceRequirements,
     adjust_resource_requirements,
 )
-from charms.tempo_coordinator_k8s.v0.tracing import TracingEndpointRequirer
+from charms.tempo_coordinator_k8s.v0.tracing import (
+    ProtocolNotRequestedError,
+    TracingEndpointRequirer,
+)
 from ops.pebble import Layer
 
 from constants import (
@@ -39,6 +42,7 @@ from constants import (
     KAFKA_INTEGRATION_NAME,
     LOGGING_INTEGRATION_NAME,
     METRICS_INTEGRATION_NAME,
+    OTEL_SERVICE_NAME,
     STANDALONE_INGESTION_MODE,
     STS_INFO_INTEGRATION_NAME,
     TRACING_INTEGRATION_NAME,
@@ -102,7 +106,7 @@ class AuthorizationServiceListenerCharm(ops.CharmBase):
             relation_name=GRAFANA_INTEGRATION_NAME,
         )
         self._tracing = TracingEndpointRequirer(
-            self, relation_name=TRACING_INTEGRATION_NAME, protocols=["otlp_http"]
+            self, relation_name=TRACING_INTEGRATION_NAME, protocols=["otlp_grpc"]
         )
         self._logging = LogForwarder(self, relation_name=LOGGING_INTEGRATION_NAME)
 
@@ -196,19 +200,31 @@ class AuthorizationServiceListenerCharm(ops.CharmBase):
         return self._kafka_handler.is_ready()
 
     @property
+    def _tracing_config(self) -> TracingConfig:
+        """Return tracing configuration, guarding against non-leader databag access errors."""
+        try:
+            return TracingConfig.load(self._tracing, service_name=OTEL_SERVICE_NAME)
+        except (ProtocolNotRequestedError, ops.RelationDataAccessError, ops.ModelError) as exc:
+            logger.debug("Tracing endpoint not yet available: %s", exc)
+            return TracingConfig(service_name=OTEL_SERVICE_NAME)
+
+    @property
     def _pebble_layer(self) -> Layer:
         """Render Pebble layer with updated command and env vars."""
         return self._pebble_service.render_pebble_layer(
             self._charm_config,
+            # Set OTEL_SERVICE_NAME explicitly so it is used as the logger service field
+            # even when tracing is disabled and TracingConfig.to_env_vars() returns {}.
             {
                 "LISTENER_MODE": self._ingestion_mode,
                 "LISTENER_FEDERATED_SERVICES_STRATEGY": "fs",
+                "OTEL_SERVICE_NAME": OTEL_SERVICE_NAME,
             },
             self._database_config,
             self._sts,
             self._kafka_handler if self._is_kafka_relation_present else {},
             self.metrics_handler,
-            TracingConfig.load(self._tracing),
+            self._tracing_config,
         )
 
     @property
