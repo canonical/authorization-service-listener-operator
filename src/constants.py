@@ -4,6 +4,7 @@
 """Constants for the Authorization Service Listener Operator."""
 
 CONTAINER_NAME = "listener"
+OTEL_SERVICE_NAME = "authorization-service-listener"
 
 AUTHORIZATION_SERVICE_INFO_INTEGRATION_NAME = "authorization-service-info"
 KAFKA_INTEGRATION_NAME = "kafka"

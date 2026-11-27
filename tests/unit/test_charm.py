@@ -277,6 +277,7 @@ def test_pebble_layer_environment(
     assert env["METRICS_PORT"] == "9100"
     assert env["METRICS_PATH"] == "/metrics"
     assert env["TELEMETRY_ENABLED"] == "false"
+    assert env["OTEL_SERVICE_NAME"] == "authorization-service-listener"
 
     check = container.plan.checks["ready"]
     assert check.http["url"] == f"http://localhost:{HTTP_PORT}/healthz"
@@ -292,19 +293,106 @@ def test_tracing_relation_enables_telemetry(
     state = create_state(
         relations=[authz_info_relation, sts_relation, tracing_relation],
     )
-    out = ctx.run(ctx.on.config_changed(), state)
+    out = ctx.run(ctx.on.relation_changed(tracing_relation), state)
 
     container = out.get_container(CONTAINER_NAME)
     env = container.plan.services[PEBBLE_SERVICE_NAME].environment
     assert env["TELEMETRY_ENABLED"] == "true"
-    assert env["OTEL_EXPORTER_OTLP_ENDPOINT"] == "http://tempo:4318"
+    assert env["OTEL_EXPORTER_OTLP_ENDPOINT"] == "tempo:4317"
+    assert env["OTEL_SERVICE_NAME"] == "authorization-service-listener"
 
     broken_out = ctx.run(ctx.on.relation_broken(out.get_relation(tracing_relation.id)), out)
     broken_env = (
         broken_out.get_container(CONTAINER_NAME).plan.services[PEBBLE_SERVICE_NAME].environment
     )
     assert broken_env["TELEMETRY_ENABLED"] == "false"
+    assert broken_env["OTEL_SERVICE_NAME"] == "authorization-service-listener"
     assert "OTEL_EXPORTER_OTLP_ENDPOINT" not in broken_env
+
+
+def test_tracing_relation_missing_protocol_on_non_leader(
+    ctx: testing.Context,
+    authz_info_relation: testing.Relation,
+    sts_relation: testing.Relation,
+) -> None:
+    """Test non-leader unit handles tracing relation without requested protocol gracefully."""
+    empty_tracing_relation = testing.Relation(
+        endpoint="tracing",
+        interface="tracing",
+        remote_app_name="tempo-coordinator-k8s",
+        remote_app_data={"receivers": "[]"},
+    )
+    state = create_state(
+        leader=False,
+        relations=[authz_info_relation, sts_relation, empty_tracing_relation],
+    )
+    out = ctx.run(ctx.on.relation_changed(empty_tracing_relation), state)
+
+    container = out.get_container(CONTAINER_NAME)
+    env = container.plan.services[PEBBLE_SERVICE_NAME].environment
+    assert env["TELEMETRY_ENABLED"] == "false"
+    assert env["OTEL_SERVICE_NAME"] == "authorization-service-listener"
+    assert "OTEL_EXPORTER_OTLP_ENDPOINT" not in env
+
+
+def test_metrics_endpoint_relation_publishes_scrape_jobs_and_alerts(
+    ctx: testing.Context,
+    authz_info_relation: testing.Relation,
+    sts_relation: testing.Relation,
+) -> None:
+    """Test that metrics-endpoint relation publishes scrape jobs and alert rules."""
+    metrics_relation = testing.Relation(
+        endpoint="metrics-endpoint",
+        interface="prometheus_scrape",
+        remote_app_name="prometheus-k8s",
+    )
+    state = create_state(
+        leader=True,
+        relations=[authz_info_relation, sts_relation, metrics_relation],
+    )
+    out = ctx.run(ctx.on.relation_joined(metrics_relation), state)
+
+    rel_out = out.get_relation(metrics_relation.id)
+    scrape_jobs = json.loads(rel_out.local_app_data["scrape_jobs"])
+    assert scrape_jobs == [
+        {"metrics_path": "/metrics", "static_configs": [{"targets": ["*:9100"]}]}
+    ]
+    alert_rules = json.loads(rel_out.local_app_data["alert_rules"])
+    alert_names = {
+        rule["alert"] for group in alert_rules.get("groups", []) for rule in group.get("rules", [])
+    }
+    assert "AuthorizationServiceListenerUnavailable-multiple" in alert_names
+    assert "AuthorizationServiceListenerUnavailable-all" in alert_names
+
+
+def test_logging_relation_configures_log_forwarding(
+    ctx: testing.Context,
+    authz_info_relation: testing.Relation,
+    sts_relation: testing.Relation,
+) -> None:
+    """Test that logging relation configures Pebble log forwarding and alert rules."""
+    logging_relation = testing.Relation(
+        endpoint="logging",
+        interface="loki_push_api",
+        remote_app_name="loki-k8s",
+        remote_units_data={
+            0: {"endpoint": '{"url": "http://loki:3100/loki/api/v1/push"}'},
+        },
+    )
+    state = create_state(
+        leader=True,
+        relations=[authz_info_relation, sts_relation, logging_relation],
+    )
+    out = ctx.run(ctx.on.relation_changed(logging_relation), state)
+
+    container = out.get_container(CONTAINER_NAME)
+    assert "listener-log-forwarding" in container.layers
+    rel_out = out.get_relation(logging_relation.id)
+    alert_rules = json.loads(rel_out.local_app_data["alert_rules"])
+    alert_names = {
+        rule["alert"] for group in alert_rules.get("groups", []) for rule in group.get("rules", [])
+    }
+    assert "HighFrequencyHighSeverityLog" in alert_names
 
 
 def test_resource_reqs_from_config(

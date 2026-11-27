@@ -1,0 +1,9 @@
+groups:
+- name: AuthorizationServiceListenerHighSeverityLog
+  rules:
+  - alert: HighFrequencyHighSeverityLog
+    expr: sum by(level, juju_application, juju_model, charm) (count_over_time({%%juju_topology%%} | json | __error__ != "JSONParserErr" | level =~ `(?i)error|fatal|critical` [5m])) > 100
+    labels:
+      severity: critical
+    annotations:
+      summary: "Logs with level error or above found in application {{ $labels.juju_application }} of Juju charm {{ $labels.charm }} in model {{ $labels.juju_model }}. Frequency of logs is high."
